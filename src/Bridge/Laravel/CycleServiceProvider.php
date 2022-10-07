@@ -22,10 +22,12 @@ use Illuminate\Contracts\Config\Repository as IlluminateConfig;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Support\DeferrableProvider;
 use Illuminate\Support\ServiceProvider;
+use League\Flysystem\PathPrefixer;
 use Spiral\Tokenizer\ClassesInterface as TokenizerClassesContract;
 use Spiral\Tokenizer\ClassLocator;
 use Spiral\Tokenizer\Config\TokenizerConfig;
 use Spiral\Tokenizer\Tokenizer;
+use Symfony\Component\Filesystem\Path;
 use WayOfDev\Cycle\Collection\CollectionConfig;
 use WayOfDev\Cycle\Config;
 use WayOfDev\Cycle\Console\Commands;
@@ -33,6 +35,7 @@ use WayOfDev\Cycle\Contracts\Config\Repository as ConfigRepositoryContract;
 use WayOfDev\Cycle\Contracts\EntityManager as EntityManagerContract;
 use WayOfDev\Cycle\Contracts\SchemaManager as SchemaManagerContract;
 use WayOfDev\Cycle\Entity\Manager as EntityManager;
+use WayOfDev\Cycle\LaravelCycleOrmAdapter;
 use WayOfDev\Cycle\Schema\Manager;
 use WayOfDev\Cycle\Schema\SchemaGeneratorsFactory;
 
@@ -45,7 +48,8 @@ final class CycleServiceProvider extends ServiceProvider implements DeferrablePr
     public const CFG_KEY_COLLECTIONS = 'cycle.schema.collections';
 
     public array $singletons = [
-        SchemaGeneratorsFactory::class
+        LaravelCycleOrmAdapter::class,
+        SchemaGeneratorsFactory::class,
     ];
 
     public function provides(): array
@@ -73,7 +77,7 @@ final class CycleServiceProvider extends ServiceProvider implements DeferrablePr
     public function register(): void
     {
         $this->mergeConfigFrom(
-            __DIR__ . '/../../../../config/cycle.php',
+            $this->app[LaravelCycleOrmAdapter::class]->path('config'),
             self::CFG_KEY
         );
 
@@ -90,7 +94,7 @@ final class CycleServiceProvider extends ServiceProvider implements DeferrablePr
     {
         if ($this->app->runningInConsole()) {
             $this->publishes([
-                __DIR__ . '/../../../../config/cycle.php' => config_path('cycle.php'),
+                $this->app[LaravelCycleOrmAdapter::class]->path('config/cycle.php') => config_path('cycle.php'),
             ]);
 
             $this->registerConsoleCommands();
