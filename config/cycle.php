@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Cycle\Annotated;
 use Cycle\Database\Config;
 use Cycle\ORM\Collection;
+use Cycle\ORM\SchemaInterface;
 use Cycle\Schema;
 
 return [
@@ -39,18 +40,35 @@ return [
             ],
         ],
 
+        'shared' => [
+            'driver' => env('DB_DRIVER', 'sqlite'),
+            'reconnect' => env('DB_RECONNECTS', true),
+            'timezone' => env('DB_TIMEZONE', \config('app.timezone')),
+            'queryCache' => env('ENABLE_QUERY_CACHING', false),
+            'readonlySchema' => env('DB_CONNECTION_READONLY_SCHEMA', true),
+            'readonly' => env('DB_CONNECTION_READONLY', false),
+            'pdo_options' => []
+        ],
+
         /*
          * Configuring connections, see:
          * https://cycle-orm.dev/docs/database-connect/2.x/en
          */
         'connections' => [
-            /*
+
+            /**
              * Setup sqlite database in-memory for testing purposes
+             * {@see \Cycle\Database\Config\DriverConfig::class}
              */
-            'sqlite' => new Config\SQLiteDriverConfig(
-                connection: new Config\SQLite\MemoryConnectionConfig(),
-                queryCache: true
-            ),
+            'sqlite' => [
+                /**
+                 * options:
+                 *     - :memory:
+                 *     - <file_path>
+                 *     - ''
+                 */
+                'database' => file_exists(database_path('database.sqlite')) ? database_path('database.sqlite') : ':memory:',
+            ],
 
             'pgsql' => new Config\PostgresDriverConfig(
                 connection: new Config\Postgres\TcpConnectionConfig(
@@ -66,16 +84,18 @@ return [
                 queryCache: true
             ),
 
-            'mysql' => new Config\MySQLDriverConfig(
-                connection: new Config\MySQL\TcpConnectionConfig(
-                    database: env('DB_NAME', 'wod'),
-                    host: env('DB_HOST', '127.0.0.1'),
-                    port: (int) env('DB_PORT', 3306),
-                    user: env('DB_USER', 'wod'),
-                    password: env('DB_PASSWORD')
-                ),
-                queryCache: true,
-            ),
+            'mysql' => [
+                new Config\MySQLDriverConfig(
+                    connection: new Config\MySQL\TcpConnectionConfig(
+                        database: env('DB_NAME', 'wod'),
+                        host: env('DB_HOST', '127.0.0.1'),
+                        port: (int) env('DB_PORT', 3306),
+                        user: env('DB_USER', 'wod'),
+                        password: env('DB_PASSWORD')
+                    ),
+                    queryCache: true,
+                )
+            ],
 
             'sqlserver' => new Config\SQLServerDriverConfig(
                 connection: new Config\SQLServer\TcpConnectionConfig(
@@ -109,7 +129,12 @@ return [
          * every schema with not defined segments
          */
         'defaults' => [
-            // ...
+            SchemaInterface::MAPPER => \Cycle\ORM\Mapper\Mapper::class,
+            SchemaInterface::REPOSITORY => \Cycle\ORM\Select\Repository::class,
+            SchemaInterface::SCOPE => null,
+            SchemaInterface::TYPECAST_HANDLER => [
+                //
+            ],
         ],
 
         'collections' => [

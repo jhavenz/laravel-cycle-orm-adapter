@@ -6,7 +6,6 @@ namespace WayOfDev\Cycle\Bridge\Laravel;
 
 use Cycle\Database\Config\DatabaseConfig;
 use Cycle\Database\DatabaseInterface as DatabaseContract;
-use Cycle\Database\DatabaseManager;
 use Cycle\Database\DatabaseProviderInterface as DatabaseProviderContract;
 use Cycle\Migrations\Config\MigrationConfig;
 use Cycle\Migrations\FileRepository;
@@ -19,16 +18,14 @@ use Cycle\ORM\ORMInterface;
 use Cycle\ORM\SchemaInterface;
 use Illuminate\Contracts\Cache\Factory as CacheContract;
 use Illuminate\Contracts\Config\Repository as IlluminateConfig;
-use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Support\DeferrableProvider;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
-use League\Flysystem\PathPrefixer;
+use Spiral\Tokenizer\ClassesInterface;
 use Spiral\Tokenizer\ClassesInterface as TokenizerClassesContract;
 use Spiral\Tokenizer\ClassLocator;
 use Spiral\Tokenizer\Config\TokenizerConfig;
 use Spiral\Tokenizer\Tokenizer;
-use Symfony\Component\Filesystem\Path;
 use WayOfDev\Cycle\Collection\CollectionConfig;
 use WayOfDev\Cycle\Config;
 use WayOfDev\Cycle\Console\Commands;
@@ -42,15 +39,8 @@ use WayOfDev\Cycle\Schema\SchemaGeneratorsFactory;
 
 final class CycleServiceProvider extends ServiceProvider implements DeferrableProvider
 {
-    public const CFG_KEY = 'cycle';
-    public const CFG_KEY_DATABASE = 'cycle.database';
-    public const CFG_KEY_TOKENIZER = 'cycle.tokenizer';
-    public const CFG_KEY_MIGRATIONS = 'cycle.migrations';
-    public const CFG_KEY_COLLECTIONS = 'cycle.schema.collections';
-
     public array $singletons = [
         LaravelCycleOrmAdapter::class,
-        SchemaGeneratorsFactory::class,
     ];
 
     public function provides(): array
@@ -88,7 +78,7 @@ final class CycleServiceProvider extends ServiceProvider implements DeferrablePr
 
         $this->mergeConfigFrom(
             $this->app[LaravelCycleOrmAdapter::class]->configPath('cycle.php'),
-            self::CFG_KEY
+            LaravelCycleOrmAdapter::CFG_KEY
         );
     }
 
@@ -96,7 +86,7 @@ final class CycleServiceProvider extends ServiceProvider implements DeferrablePr
     {
         if ($this->app->runningInConsole()) {
             $this->publishes([
-                $this->app[LaravelCycleOrmAdapter::class]->basePath('config/cycle.php') => config_path('cycle.php'),
+                $this->app[LaravelCycleOrmAdapter::class]->configPath('cycle.php') => config_path('cycle.php'),
             ]);
 
             $this->registerConsoleCommands();
@@ -132,7 +122,7 @@ final class CycleServiceProvider extends ServiceProvider implements DeferrablePr
         $this->app->singleton(
             ConfigRepositoryContract::class,
             static fn (Application $app): ConfigRepositoryContract => Config::fromArray(
-                config: $app[IlluminateConfig::class]->get(self::CFG_KEY)
+                config: $app[IlluminateConfig::class]->get(LaravelCycleOrmAdapter::CFG_KEY)
             )
         );
     }
@@ -142,7 +132,7 @@ final class CycleServiceProvider extends ServiceProvider implements DeferrablePr
         $this->app->singleton(
             TokenizerConfig::class,
             static fn (Application $app): TokenizerConfig => new TokenizerConfig(
-                config: $app[IlluminateConfig::class]->get(self::CFG_KEY_TOKENIZER)
+                config: $app[IlluminateConfig::class]->get(LaravelCycleOrmAdapter::CFG_KEY_TOKENIZER)
             )
         );
 
@@ -158,6 +148,11 @@ final class CycleServiceProvider extends ServiceProvider implements DeferrablePr
             static fn (Application $app): TokenizerClassesContract => $app[Tokenizer::class]
         );
 
+        $this->app->bind(
+            ClassesInterface::class,
+            static fn (Application $app): ClassesInterface => $app->make(ClassLocator::class)
+        );
+
         $this->app->alias(
             TokenizerClassesContract::class,
             ClassLocator::class
@@ -169,15 +164,13 @@ final class CycleServiceProvider extends ServiceProvider implements DeferrablePr
         $this->app->singleton(
             DatabaseConfig::class,
             static fn (Application $app): DatabaseConfig => new DatabaseConfig(
-                config: $app[IlluminateConfig::class]->get(self::CFG_KEY_DATABASE)
+                config: $app[IlluminateConfig::class]->get(LaravelCycleOrmAdapter::CFG_KEY_DATABASE)
             )
         );
 
         $this->app->singleton(
             DatabaseProviderContract::class,
-            static fn (Application $app): DatabaseProviderContract => new DatabaseManager(
-                config: $app[DatabaseConfig::class]
-            )
+            static fn (Application $app): DatabaseProviderContract => $app[LaravelCycleOrmAdapter::class]
         );
 
         $this->app->bind(
@@ -185,10 +178,10 @@ final class CycleServiceProvider extends ServiceProvider implements DeferrablePr
             static fn (Application $app): DatabaseContract => $app[DatabaseProviderContract::class]->database()
         );
 
-        $this->app->alias(
-            DatabaseProviderContract::class,
-            DatabaseManager::class
-        );
+        //$this->app->alias(
+        //    DatabaseProviderContract::class,
+        //    DatabaseManager::class
+        //);
     }
 
     private function registerEntityManager(): void
@@ -204,7 +197,7 @@ final class CycleServiceProvider extends ServiceProvider implements DeferrablePr
         $this->app->singleton(
             CollectionConfig::class,
             static fn (Application $app): CollectionConfig => new CollectionConfig(
-                config: $app[IlluminateConfig::class]->get(self::CFG_KEY_COLLECTIONS)
+                config: $app[IlluminateConfig::class]->get(LaravelCycleOrmAdapter::CFG_KEY_COLLECTIONS)
             )
         );
 
@@ -233,7 +226,7 @@ final class CycleServiceProvider extends ServiceProvider implements DeferrablePr
         $this->app->singleton(
             MigrationConfig::class,
             static fn (Application $app): MigrationConfig => new MigrationConfig(
-                config: $app[IlluminateConfig::class]->get(self::CFG_KEY_MIGRATIONS)
+                config: $app[IlluminateConfig::class]->get(LaravelCycleOrmAdapter::CFG_KEY_MIGRATIONS)
             )
         );
 
@@ -262,12 +255,20 @@ final class CycleServiceProvider extends ServiceProvider implements DeferrablePr
         );
 
         $this->app->singleton(
+            SchemaGeneratorsFactory::class,
+            static fn (Application $app): SchemaGeneratorsFactory => new SchemaGeneratorsFactory(
+                app: $app,
+                generatorClasses: $app[IlluminateConfig::class]->get(LaravelCycleOrmAdapter::CFG_KEY_GENERATORS)
+            )
+        );
+
+        $this->app->bind(
             SchemaManagerContract::class,
-            static fn (Application $app): SchemaManagerContract => new Manager(
-                databaseManager: $app[DatabaseProviderContract::class],
+            static fn (Application $app, array $params = []): SchemaManagerContract => new Manager(
+                databaseManager: $app[LaravelCycleOrmAdapter::class]->getDatabaseManager($params['connection'] ?? null),
                 schemaGeneratorsFactory: $app[SchemaGeneratorsFactory::class],
                 config: $app[ConfigRepositoryContract::class],
-                cache: $app[CacheContract::class]
+                cache: $app[CacheContract::class]->store()
             )
         );
     }
