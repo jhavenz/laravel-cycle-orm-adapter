@@ -21,6 +21,7 @@ use Illuminate\Contracts\Cache\Factory as CacheContract;
 use Illuminate\Contracts\Config\Repository as IlluminateConfig;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Support\DeferrableProvider;
+use Illuminate\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 use League\Flysystem\PathPrefixer;
 use Spiral\Tokenizer\ClassesInterface as TokenizerClassesContract;
@@ -76,11 +77,7 @@ final class CycleServiceProvider extends ServiceProvider implements DeferrablePr
 
     public function register(): void
     {
-        $this->mergeConfigFrom(
-            $this->app[LaravelCycleOrmAdapter::class]->path('config'),
-            self::CFG_KEY
-        );
-
+        $this->registerPackageManager();
         $this->registerConfigAdapter();
         $this->registerClassLocator();
         $this->registerDatabaseManager();
@@ -88,17 +85,30 @@ final class CycleServiceProvider extends ServiceProvider implements DeferrablePr
         $this->registerORM();
         $this->registerMigrator();
         $this->registerSchemaManager();
+
+        $this->mergeConfigFrom(
+            $this->app[LaravelCycleOrmAdapter::class]->configPath('cycle.php'),
+            self::CFG_KEY
+        );
     }
 
     public function boot(): void
     {
         if ($this->app->runningInConsole()) {
             $this->publishes([
-                $this->app[LaravelCycleOrmAdapter::class]->path('config/cycle.php') => config_path('cycle.php'),
+                $this->app[LaravelCycleOrmAdapter::class]->basePath('config/cycle.php') => config_path('cycle.php'),
             ]);
 
             $this->registerConsoleCommands();
         }
+    }
+
+    private function registerPackageManager(): void
+    {
+        $this->app->resolving(
+            LaravelCycleOrmAdapter::class,
+            static fn (LaravelCycleOrmAdapter $manager) => $manager->registerBaseBindings()
+        );
     }
 
     private function registerConsoleCommands(): void
@@ -121,7 +131,7 @@ final class CycleServiceProvider extends ServiceProvider implements DeferrablePr
     {
         $this->app->singleton(
             ConfigRepositoryContract::class,
-            static fn (Container $app): ConfigRepositoryContract => Config::fromArray(
+            static fn (Application $app): ConfigRepositoryContract => Config::fromArray(
                 config: $app[IlluminateConfig::class]->get(self::CFG_KEY)
             )
         );
@@ -131,21 +141,21 @@ final class CycleServiceProvider extends ServiceProvider implements DeferrablePr
     {
         $this->app->singleton(
             TokenizerConfig::class,
-            static fn (Container $app): TokenizerConfig => new TokenizerConfig(
+            static fn (Application $app): TokenizerConfig => new TokenizerConfig(
                 config: $app[IlluminateConfig::class]->get(self::CFG_KEY_TOKENIZER)
             )
         );
 
         $this->app->singleton(
             Tokenizer::class,
-            static fn (Container $app): Tokenizer => new Tokenizer(
+            static fn (Application $app): Tokenizer => new Tokenizer(
                 config: $app[TokenizerConfig::class]
             )
         );
 
         $this->app->singleton(
             ClassLocator::class,
-            static fn (Container $app): TokenizerClassesContract => $app[Tokenizer::class]
+            static fn (Application $app): TokenizerClassesContract => $app[Tokenizer::class]
         );
 
         $this->app->alias(
@@ -158,21 +168,21 @@ final class CycleServiceProvider extends ServiceProvider implements DeferrablePr
     {
         $this->app->singleton(
             DatabaseConfig::class,
-            static fn (Container $app): DatabaseConfig => new DatabaseConfig(
+            static fn (Application $app): DatabaseConfig => new DatabaseConfig(
                 config: $app[IlluminateConfig::class]->get(self::CFG_KEY_DATABASE)
             )
         );
 
         $this->app->singleton(
             DatabaseProviderContract::class,
-            static fn (Container $app): DatabaseProviderContract => new DatabaseManager(
+            static fn (Application $app): DatabaseProviderContract => new DatabaseManager(
                 config: $app[DatabaseConfig::class]
             )
         );
 
         $this->app->bind(
             DatabaseContract::class,
-            static fn (Container $app): DatabaseContract => $app[DatabaseProviderContract::class]->database()
+            static fn (Application $app): DatabaseContract => $app[DatabaseProviderContract::class]->database()
         );
 
         $this->app->alias(
@@ -185,7 +195,7 @@ final class CycleServiceProvider extends ServiceProvider implements DeferrablePr
     {
         $this->app->singleton(
             EntityManagerContract::class,
-            static fn (Container $app): EntityManagerContract => $app[EntityManager::class]
+            static fn (Application $app): EntityManagerContract => $app[EntityManager::class]
         );
     }
 
@@ -193,14 +203,14 @@ final class CycleServiceProvider extends ServiceProvider implements DeferrablePr
     {
         $this->app->singleton(
             CollectionConfig::class,
-            static fn (Container $app): CollectionConfig => new CollectionConfig(
+            static fn (Application $app): CollectionConfig => new CollectionConfig(
                 config: $app[IlluminateConfig::class]->get(self::CFG_KEY_COLLECTIONS)
             )
         );
 
         $this->app->singleton(
             OrmFactoryInterface::class,
-            static fn (Container $app): OrmFactoryInterface => new Factory(
+            static fn (Application $app): OrmFactoryInterface => new Factory(
                 dbal: $app[DatabaseProviderContract::class],
                 defaultCollectionFactory: with(
                     $app[CollectionConfig::class]->getDefaultCollectionFactoryClass(),
@@ -211,7 +221,7 @@ final class CycleServiceProvider extends ServiceProvider implements DeferrablePr
 
         $this->app->singleton(
             ORMInterface::class,
-            static fn (Container $app): ORMInterface => new ORM(
+            static fn (Application $app): ORMInterface => new ORM(
                 factory: $app[OrmFactoryInterface::class],
                 schema: $app[SchemaInterface::class]
             )
@@ -222,21 +232,21 @@ final class CycleServiceProvider extends ServiceProvider implements DeferrablePr
     {
         $this->app->singleton(
             MigrationConfig::class,
-            static fn (Container $app): MigrationConfig => new MigrationConfig(
+            static fn (Application $app): MigrationConfig => new MigrationConfig(
                 config: $app[IlluminateConfig::class]->get(self::CFG_KEY_MIGRATIONS)
             )
         );
 
         $this->app->singleton(
             MigrationRepositoryContract::class,
-            static fn (Container $app): MigrationRepositoryContract => new FileRepository(
+            static fn (Application $app): MigrationRepositoryContract => new FileRepository(
                 config: $app[MigrationConfig::class]
             )
         );
 
         $this->app->singleton(
             CycleMigrator::class,
-            static fn (Container $app): CycleMigrator => new CycleMigrator(
+            static fn (Application $app): CycleMigrator => new CycleMigrator(
                 config: $app[MigrationConfig::class],
                 dbal: $app[DatabaseProviderContract::class],
                 repository: $app[MigrationRepositoryContract::class]
@@ -248,12 +258,12 @@ final class CycleServiceProvider extends ServiceProvider implements DeferrablePr
     {
         $this->app->singleton(
             SchemaInterface::class,
-            static fn (Container $app): SchemaInterface => $app[SchemaManagerContract::class]->create()
+            static fn (Application $app): SchemaInterface => $app[SchemaManagerContract::class]->create()
         );
 
         $this->app->singleton(
             SchemaManagerContract::class,
-            static fn (Container $app): SchemaManagerContract => new Manager(
+            static fn (Application $app): SchemaManagerContract => new Manager(
                 databaseManager: $app[DatabaseProviderContract::class],
                 schemaGeneratorsFactory: $app[SchemaGeneratorsFactory::class],
                 config: $app[ConfigRepositoryContract::class],
