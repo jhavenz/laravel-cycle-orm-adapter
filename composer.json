@@ -83,7 +83,7 @@
     "extra": {
         "laravel": {
             "providers": [
-                "WayOfDev\\Cycle\\Bridge\\Laravel\\Providers\\PackageServiceProvider"
+                "WayOfDev\\Cycle\\Bridge\\Laravel\\Providers\\CycleServiceProvider"
             ],
             "aliases": {
                 "Package": "Cycle"
