@@ -8,7 +8,7 @@ use Faker\Factory as FakerFactory;
 use Faker\Generator;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Orchestra\Testbench\TestCase as Orchestra;
-use WayOfDev\Cycle\Bridge\Laravel\Providers\CycleServiceProvider;
+use WayOfDev\Cycle\Bridge\Laravel\CycleServiceProvider;
 
 use function array_key_exists;
 

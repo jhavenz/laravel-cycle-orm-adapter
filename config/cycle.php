@@ -17,7 +17,7 @@ return [
      */
     'tokenizer' => [
         'directories' => [
-            app_path(),
+            app_path('Models'),
         ],
 
         // ...
