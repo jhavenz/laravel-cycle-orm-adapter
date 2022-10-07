@@ -37,7 +37,7 @@ class CycleServiceProviderTest extends TestCase
         $config = $this->app->get(ConfigRepository::class);
 
         self::assertInstanceOf(ConfigRepository::class, $config);
-        self::assertEquals(app_path(), $config->tokenizer()['directories'][0]);
+        self::assertEquals(app_path('Models'), $config->tokenizer()['directories'][0]);
     }
 
     /**

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace WayOfDev\Cycle\Tests\Entity;
 
 use ReflectionException;
+use WayOfDev\Cycle\Contracts\EntityManager;
 use WayOfDev\Cycle\Entity\Manager;
+use WayOfDev\Cycle\Tests\Stubs\User;
 use WayOfDev\Cycle\Tests\Stubs\UserFactory;
 use WayOfDev\Cycle\Tests\TestCase;
 
@@ -18,10 +20,14 @@ final class ManagerTest extends TestCase
      */
     public function it_should_persist_entity_using_entity_manager(): void
     {
-        /** @var User $user */
-        $user = UserFactory::new()->make();
+        User::migrate();
 
-        $this->app->make(Manager::class)->persist($user);
+        /** @var User $user */
+        $user = User::factory()->make([
+            'id' => 1
+        ]);
+
+        $this->app->make(EntityManager::class)->persist($user);
 
         $this->assertDatabaseHas('users', [
             'id' => $user->getId(),

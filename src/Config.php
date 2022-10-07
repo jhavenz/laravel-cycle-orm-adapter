@@ -22,6 +22,16 @@ final class Config implements Repository
         'relations',
     ];
 
+    private function __construct(
+        private readonly array $tokenizer,
+        private readonly array $databases,
+        private readonly array $schema,
+        private readonly array $migrations,
+        private readonly array $relations
+    ) {
+        //
+    }
+
     public static function fromArray(array $config): self
     {
         $missingAttributes = array_diff(array_keys($config), self::REQUIRED_FIELDS);
@@ -46,6 +56,16 @@ final class Config implements Repository
         return $this->tokenizer;
     }
 
+    public function connection(string $connection, mixed $default = null): mixed
+    {
+        return Arr::get($this->databases, 'connections.'.$connection, $default);
+    }
+
+    public function database(string $path, mixed $default = null): mixed
+    {
+        return Arr::get($this->databases, $path, $default);
+    }
+
     public function databases(): array
     {
         return $this->databases;
@@ -56,27 +76,18 @@ final class Config implements Repository
         return $this->schema;
     }
 
-    public function migrationsDirectory(): string
+    public function migrationsDirectory(mixed $default = null): string
     {
-        return Arr::get($this->migrations, 'directory');
+        return Arr::get($this->migrations, 'directory', $default);
     }
 
-    public function migrationsTable(): string
+    public function migrationsTable(mixed $default = null): string
     {
-        return Arr::get($this->migrations, 'table');
+        return Arr::get($this->migrations, 'table', $default);
     }
 
     public function relations(): array
     {
         return $this->relations;
-    }
-
-    private function __construct(
-        private readonly array $tokenizer,
-        private readonly array $databases,
-        private readonly array $schema,
-        private readonly array $migrations,
-        private readonly array $relations
-    ) {
     }
 }

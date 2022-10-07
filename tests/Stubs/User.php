@@ -4,19 +4,46 @@ declare(strict_types=1);
 
 namespace WayOfDev\Cycle\Tests\Stubs;
 
+use Cycle\Annotated\Annotation\Column;
+use Cycle\Annotated\Annotation\Entity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
+/**
+ * @method static UserFactory factory($count = null, $state = [])
+ */
+#[Entity(
+    role: 'users',
+    repository: UserRepository::class,
+    table: 'users',
+    database: 'default',
+)]
 final class User
 {
     use HasFactory;
 
-    private mixed $id;
+    #[Column(type: 'primary')]
+    private int $id;
 
+    #[Column(type: 'string')]
     private string $password;
 
+    #[Column(type: 'string')]
     private string $rememberToken = '';
 
+    #[Column(type: 'string')]
     private string $name;
+
+    public static function migrate(): void
+    {
+        Schema::create('users', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->string('password');
+            $table->string('remember_token');
+        });
+    }
 
     public static function resolveFactoryName(): string
     {
@@ -25,10 +52,10 @@ final class User
 
     protected static function newFactory(): UserFactory
     {
-        return UserFactory::new();
+        return new UserFactory();
     }
 
-    public function getId(): string
+    public function getId(): int
     {
         return $this->id;
     }

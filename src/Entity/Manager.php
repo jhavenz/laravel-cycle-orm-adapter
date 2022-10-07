@@ -6,31 +6,70 @@ namespace WayOfDev\Cycle\Entity;
 
 use Cycle\ORM\ORMInterface;
 use Cycle\ORM\RepositoryInterface;
+use Cycle\ORM\Transaction\RunnerInterface;
+use Cycle\ORM\Transaction\StateInterface;
+use Cycle\ORM\Transaction\UnitOfWork;
 use WayOfDev\Cycle\Contracts\EntityManager;
 
 final class Manager implements EntityManager
 {
-    private ORMInterface $orm;
+    private UnitOfWork $unitOfWork;
 
-    public function __construct(ORMInterface $orm)
+    public function __construct(private ORMInterface $orm)
     {
-        $this->orm = $orm;
+        $this->clean();
     }
 
-    public function persist(object $entity, bool $cascade = true): EntityManager
+    public function persistState(object $entity, bool $cascade = true): static
     {
-        // ...
+        $this->unitOfWork->persistState($entity, $cascade);
+
+        return $this;
     }
 
-    public function delete(object $entity, bool $cascade = true): EntityManager
+    public function persist(object $entity, bool $cascade = true): static
     {
-        // ...
+        $this->unitOfWork->persistDeferred($entity, $cascade);
+
+        return $this;
+    }
+
+    public function delete(object $entity, bool $cascade = true): static
+    {
+        $this->unitOfWork->delete($entity, $cascade);
+
+        return $this;
+    }
+
+    public function run(bool $throwException = true, ?RunnerInterface $runner = null): StateInterface
+    {
+        if ($runner !== null) {
+            $this->unitOfWork->setRunner($runner);
+        }
+
+        $state = $this->unitOfWork->run();
+        $this->clean();
+
+        if ($throwException && !$state->isSuccess()) {
+            throw $state->getLastError();
+        }
+
+        return $state;
+    }
+
+    public function clean(bool $cleanHeap = false): static
+    {
+        $this->unitOfWork = new UnitOfWork($this->orm);
+        $cleanHeap && $this->orm->getHeap()->clean();
+
+        return $this;
     }
 
     /**
      * @template TEntity of object
      *
-     * @return RepositoryInterface<TEntity>
+     * @param  object  $entity
+     * @return RepositoryInterface
      */
     private function getRepository(object $entity): RepositoryInterface
     {
